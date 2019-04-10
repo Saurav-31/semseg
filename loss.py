@@ -1,5 +1,30 @@
 import torch.nn.functional as F
 import torch
+import eval_metrics as ev
+
+def calc_metrics(label, out_pred):
+    n = label.size(0)
+    # print("Batch Size: ", n)
+    pix_acc = 0
+    mean_acc = 0
+    mean_iou = 0
+    freq_w_iou = 0
+
+    for i in range(n):
+        gt = label[i].cpu().data.numpy()
+        pred = out_pred[i].cpu().data.numpy()
+        
+        pix_acc += ev.pixel_accuracy(gt, pred)
+        mean_acc += ev.mean_accuracy(gt, pred)
+        mean_iou += ev.mean_IU(gt, pred)
+        freq_w_iou += ev.frequency_weighted_IU(gt, pred)
+
+    # print("Pixel Accuracy: ", pix_acc/n)
+    # print("Mean Accuracy: ", mean_acc/n)
+    # print("Mean IOU: ", mean_iou/n)
+    # print("Frequency Weighted IOU: ", freq_w_iou/n)
+
+    return pix_acc/n, mean_acc/n, mean_iou/n, freq_w_iou/n
 
 def cross_entropy2d(input, target, weight=None, size_average=True):
     n, c, h, w = input.size()
@@ -29,10 +54,11 @@ def dice_loss(input ,target):
     tflat = target.contiguous().view(-1)
     intersection = (iflat * tflat).sum()
 
-    A_sum = torch.sum(tflat * iflat)
+    A_sum = torch.sum(iflat * iflat)
     B_sum = torch.sum(tflat * tflat)
 
-    return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth))
+    # return 1 - ((2. * intersection + smooth) / (A_sum + B_sum + smooth))
+    return 1 - ((intersection + smooth) / (A_sum + B_sum - intersection + smooth))
 
 
 # def dice_loss(input, target, num_classes=21):

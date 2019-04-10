@@ -18,10 +18,10 @@ class PascalVOCLoader(Dataset):
 		self.augmentations = augmentations
 		self.img_norm = img_norm
 		self.n_classes = 21
+		self.classes = self.pascal_classes()
 		self.mean = np.array([104.00699, 116.66877, 122.67892])
 		self.files = collections.defaultdict(list)
-		self.img_size = ( img_size if isinstance(img_size, tuple) else (img_size, img_size))
-
+		self.img_size = ( img_size if isinstance(img_size, tuple) else (img_size, img_size))		
 		for split in ["train", "val", "trainval"]:
 		    path = os.path.join(self.root, "ImageSets/Segmentation/", split + ".txt")
 		    file_list = tuple(open(path, "r"))
@@ -136,6 +136,12 @@ class PascalVOCLoader(Dataset):
 		else:
 		    return rgb
 
+	def pascal_classes(self):
+		classes = ['background', 'aeroplane', 'bicycle', 'bird',
+					'boat','bottle','bus','car','cat','chair','cow','diningtable',
+					'dog','horse','motorbike','person','pottedplant','sheep','sofa','train','tvmonitor']
+
+		return classes
 
 # import ptsemseg.augmentations as aug
 # local_path = '/mnt/sqnap1/saugupt/public_datasets/PascalVoc2012/'

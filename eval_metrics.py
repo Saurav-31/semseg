@@ -96,7 +96,7 @@ def frequency_weighted_IU(eval_segm, gt_segm):
     '''
     sum_k(t_k)^(-1) * sum_i((t_i*n_ii)/(t_i + sum_j(n_ji) - n_ii))
     '''
-
+    
     check_size(eval_segm, gt_segm)
 
     cl, n_cl = union_classes(eval_segm, gt_segm)

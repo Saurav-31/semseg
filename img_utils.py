@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
+from collections import Counter
 
 def showBatchImage(img, label, out, imgname):
 	plt.figure(0, figsize=(15, 15))
-	batch_size = img.size(1)
+	batch_size = min(img.size(0), 5)
 
 	for i in range(batch_size):
 		# print(img[0].shape)
@@ -32,7 +33,7 @@ def show_sample_img(img, label):
 def showBatchImage_decode(img, label, out, dst, imgname):
 	
 	plt.figure(0, figsize=(20, 20))
-	batch_size = img.size(1)
+	batch_size = min(img.size(0), 5)
 
 	for i in range(batch_size):
 		# print(img[0].shape)
@@ -47,3 +48,19 @@ def showBatchImage_decode(img, label, out, dst, imgname):
 
 	plt.show()
 	plt.savefig(imgname)
+
+
+def getClassWeights(dst):
+	weights = Counter()
+
+	for i in range(len(dst)):
+	    for m in dst[i][1].unique(): 
+	        if weights.get(m.item(), None) == None: 
+	            weights[m.item()] = 1
+	        else:
+	            weights[m.item()] += 1
+
+	for key, val in weights.items(): 
+	    weights[key] = len(dst)/val
+
+	return weights 
