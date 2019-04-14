@@ -78,7 +78,7 @@ def train(model, device, train_loader, optimizer, epoch, conf, loss_fn, num_clas
     print("Mean IOU: ", mean_iou/nbatches)
     print("Frequency Weighted IOU: ", freq_w_iou/nbatches)
 
-    f = open("{}/train_loss.txt".format(conf['log_path']), "w")
+    f = open("{}/train_loss.txt".format(conf['log_path']), "a")
     f.write("{}\n".format(global_loss/nbatches))
     f.close()
 
@@ -144,7 +144,7 @@ def val(model, device, test_loader, epoch, data_size, conf, loss_fn, num_classes
     print("Mean IOU: ", mean_iou/nbatches)
     print("Frequency Weighted IOU: ", freq_w_iou/nbatches)
     
-    f = open("{}/val_loss.txt".format(conf['log_path']), "w")
+    f = open("{}/val_loss.txt".format(conf['log_path']), "a")
     f.write("{}\n".format(test_loss))
     f.close()
 

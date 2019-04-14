@@ -29,7 +29,7 @@ conf = {
   'imsize': 256 ,
   'seed': 123, 
   'val_split': 0.1,
-  'gpu': 4, 
+  'gpu': 2, 
   'num_gpus': 1,
   'max_epochs': 500, 
   'batch_size': 8,
@@ -42,13 +42,16 @@ conf = {
   'loss_params': {
     'size_average': True
   },
-  'resume_training': True,
-  'local_path': '/mnt/sqnap1/saugupt/public_datasets/PascalVoc2012/',
-  'load_model_dir': "./experiments/exp1/models/FCN8_vgg16_61.net",
-  'exp_dir': 'load_ep61_exp1_weighted_loss_bs8'
+  'resume_training': False,
+  'dataset_path': '/mnt/sqnap1/saugupt/public_datasets/PascalVoc2012/',
+  'load_model_dir': "./experiments/scratch_training_weighted_loss_bs8/",
+  'load_model': "models/FCN8_vgg16_50.net",
+  'exp_dir': 'scratch_training_no_vgg_init'
 }
 
 os.makedirs("./experiments/", exist_ok=True)
+
+conf['load_model_path'] = os.path.join(conf['load_model_dir'], conf['load_model'])
 
 conf['save_path'] = './experiments/{}'.format(conf['exp_dir'])
 conf['model_path'] =  os.path.join(conf['save_path'], "models/")
@@ -66,8 +69,10 @@ size = conf['imsize']
 #                                      transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 data_transform1 = transforms.Compose([transforms.Resize(256), transforms.ToTensor()])
+# augs = transforms.RandomAffine(degrees=30, scale=(0.8, 1.4))
+augs = None
 
-dst = PascalVOCLoader(root=conf['local_path'], is_transform=True, transform = data_transform1, augmentations=None, img_norm=conf['img_norm'], split = 'trainval')
+dst = PascalVOCLoader(root=conf['dataset_path'], is_transform=True, transform = data_transform1, augmentations=augs, img_norm=conf['img_norm'], split = 'trainval')
 
 # img, label  = dst[0]  
 # show_sample_img(img, label)
@@ -106,15 +111,23 @@ dataloaders = {'train': train_loader, 'val': validation_loader}
 dataset_sizes = {'train': len(train_indices), 'val': len(val_indices)}
 
 model = fcn8s(n_classes=21)
-conf['classWeights'] = torch.Tensor(list(getClassWeights(dst).values())).cuda()
+conf['classWeights'] = torch.Tensor(list(getClassWeights(dst).values()))
 
 if conf['resume_training']:
-    print("Loading Pretrained Model from: ", conf['load_model_dir'])
-    model.load_state_dict(torch.load(conf['load_model_dir']))
+    print("Loading Pretrained Model from: ", conf['load_model_path'])
+    model.load_state_dict(torch.load(conf['load_model_path']))
+    
+    pickle_path = '{}/conf.pickle'.format(conf['load_model_dir'])
+    with open(pickle_path, "rb") as f:
+    	dd = pickle.load(f)
+    f.close()
+
+    conf['best_mean_iou'] = dd['best_mean_iou'] 
 else:
     print("Creating a scratch FCN-8 Model with vgg weights")
     vgg16 = models.vgg16(pretrained=True)
     model.init_vgg16_params(vgg16)
+    conf['best_mean_iou'] = -10 
 
 if conf['num_gpus'] >1:
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
@@ -133,7 +146,7 @@ optimizer_ft = optim.SGD(model.parameters(), **conf['optimizer_config'])
 
 # loss_fn = dice_loss
 # loss_fn = nn.BCEWithLogitsLoss()
-loss_fn = nn.BCEWithLogitsLoss(pos_weight = conf['classWeights'])
+loss_fn = nn.BCEWithLogitsLoss(pos_weight = conf['classWeights'].to(device))
 # loss_fn = functools.partial(cross_entropy2d, **conf['loss_params'])
 
 epochs = conf['max_epochs']
@@ -143,8 +156,6 @@ num_classes = 21
 
 print("Saving Conf Parameters: {}".format(conf['save_path']))
 conf_path = "{}/conf.pickle".format(conf['save_path'])
-
-conf['best_mean_iou'] = -10 
 
 since = time.time()
 for epoch in range(1, epochs + 1):

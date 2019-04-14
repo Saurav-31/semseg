@@ -15,7 +15,7 @@ class PascalVOCLoader(Dataset):
 		self.root = os.path.expanduser(root)
 		self.split = split
 		self.is_transform = is_transform
-		self.augmentations = augmentations
+		self.aug = augmentations
 		self.img_norm = img_norm
 		self.n_classes = 21
 		self.classes = self.pascal_classes()
@@ -39,7 +39,7 @@ class PascalVOCLoader(Dataset):
 		lbl_path = os.path.join(self.root, "SegmentationClass/", im_name + ".png")
 		im = Image.open(im_path)
 		lbl = Image.open(lbl_path)
-		if self.augmentations is not None:
+		if self.aug is not None:
 		    im, lbl = self.augmentations(im, lbl)
 		if self.is_transform:
 		    im, lbl = self.transform(im, lbl)
@@ -54,6 +54,20 @@ class PascalVOCLoader(Dataset):
 		img = self.tf(img)
 		lbl = torch.from_numpy(np.array(lbl)).long()
 		lbl[lbl == 255] = 0
+		return img, lbl
+
+	def augmentations(self, img, lbl):
+		img = img.resize((self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+		lbl = lbl.resize((self.img_size[0], self.img_size[1]))
+		
+		img = img.convert('RGB')
+		jpg_to_tensor = transforms.ToTensor()
+		tensor_to_pil = transforms.ToPILImage()
+		img = tensor_to_pil(jpg_to_tensor(img))
+
+		img = self.aug(img)
+		lbl = self.aug(lbl)
+
 		return img, lbl
 
 	def get_pascal_labels(self):
