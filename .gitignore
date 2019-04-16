@@ -5,4 +5,5 @@ logs/
 img_dmp/
 val_imgs/
 experiments/
-
+*.jpg
+*.pkl

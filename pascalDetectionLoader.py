@@ -3,7 +3,8 @@ import os
 import numpy as np 
 from torch.utils.data import Dataset
 import collections
-
+from img_utils import *
+import matplotlib.pyplot as plt 
 
 class PascalDetection(Dataset):
     def __init__(self, root, transform,  split="trainval", is_transform=False, img_size='same', augmentations=None, img_norm=True):
@@ -31,17 +32,32 @@ class PascalDetection(Dataset):
     def __getitem__(self, index):
         im_name = self.files[self.split][index]
         img_path = os.path.join(self.root, "JPEGImages", im_name + ".jpg")
-
         label_path = os.path.join(self.root, "labels_2012/", im_name + ".txt")
 
-        im = Image.open(img_path)
-        h, w, channels = np.array(im).shape
+        im = np.array(Image.open(img_path))
+        h, w, channels = im.shape
 
         with open(label_path, "r") as f:
             lbl = f.readlines()
+        
+        lbl = np.array([list(map(float, x.split(" "))) for x in np.array(lbl)])
+        # print(clss.shape, bbox.shape)
 
         if self.aug is not None:
-            im, lbl = self.augmentations(im, lbl)
+            bbox = lbl[:, 1:]
+            clss = lbl[:, 0]
+            bbox = convert_center_to_coord(im, bbox)
+            # print("After Conversion", bbox)
+
+            im1, lbl1 = self.aug(im.copy(), bbox.copy())
+            # print("After Augmentation", lbl1)
+
+            if lbl1.shape[0] == clss.shape[0]:
+                lbl = merge_cl_bbox(clss, lbl1)
+                im = im1
+            else:
+                lbl = merge_cl_bbox(clss, bbox)
+
         if self.is_transform:
             im, lbl = self.transform(im, lbl)
 
