@@ -22,18 +22,19 @@ warnings.filterwarnings(action='ignore')
 from train import train, val
 from loss import dice_loss, accuracy, iou, cross_entropy2d
 from fcn import fcn8s
+from pspnet import pspnet
 from img_utils import showBatchImage, getClassWeights
 
 # conf = parse_cmd_args()
 conf = {
-  'imsize': 256 ,
+  'imsize': 'same' ,
   'seed': 123, 
   'val_split': 0.1,
   'gpu': 2, 
   'num_gpus': 1,
   'max_epochs': 500, 
   'batch_size': 8,
-  'img_norm': False,
+  'img_norm': True,
   'optimizer_config' : {
     'lr': 1.0e-04,
     'weight_decay': 0.0008,
@@ -42,11 +43,14 @@ conf = {
   'loss_params': {
     'size_average': True
   },
+  'train': False,
   'resume_training': False,
+  'pretrained_model': True,
   'dataset_path': '/mnt/sqnap1/saugupt/public_datasets/PascalVoc2012/',
-  'load_model_dir': "./experiments/scratch_training_weighted_loss_bs8/",
-  'load_model': "models/FCN8_vgg16_50.net",
-  'exp_dir': 'scratch_training_no_vgg_init'
+  'load_model_dir': "./evaluation/model",
+  'load_model': "pspnet_101_pascalvoc.pth",
+  'exp_dir': 'pspnet_inference',
+  'model': 'pspnet' #'fcn8s'
 }
 
 os.makedirs("./experiments/", exist_ok=True)
@@ -68,7 +72,8 @@ size = conf['imsize']
 #                                      transforms.RandomAffine(0, scale=(1.1, 1.4)),
 #                                      transforms.ToTensor(), transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
-data_transform1 = transforms.Compose([transforms.Resize(256), transforms.ToTensor()])
+# data_transform1 = transforms.Compose([transforms.Resize(size), transforms.ToTensor()])
+data_transform1 = transforms.ToTensor()
 # augs = transforms.RandomAffine(degrees=30, scale=(0.8, 1.4))
 augs = None
 
@@ -110,24 +115,44 @@ print("GPU: ", conf['gpu'])
 dataloaders = {'train': train_loader, 'val': validation_loader}
 dataset_sizes = {'train': len(train_indices), 'val': len(val_indices)}
 
-model = fcn8s(n_classes=21)
+if conf['model'] == 'fcn8s':
+  model = fcn8s(n_classes=21)
+elif conf['model'] == 'pspnet':
+  model = pspnet(version="pascal").float()
+else:
+  print("Model not specified")
+  exit()
+
 conf['classWeights'] = torch.Tensor(list(getClassWeights(dst).values()))
 
+# conf['classWeights'][0] = 0 
+# print(conf['classWeights'])
+# exit()
+
 if conf['resume_training']:
-    print("Loading Pretrained Model from: ", conf['load_model_path'])
+    print("Resuming Training for Model from: ", conf['load_model_path'])
     model.load_state_dict(torch.load(conf['load_model_path']))
     
     pickle_path = '{}/conf.pickle'.format(conf['load_model_dir'])
     with open(pickle_path, "rb") as f:
     	dd = pickle.load(f)
     f.close()
+    print(dd)
+    conf['best_mean_iou'] = 0.3 #dd['best_mean_iou'] 
+    conf['best_epoch'] = dd['best_epoch']
 
-    conf['best_mean_iou'] = dd['best_mean_iou'] 
-else:
-    print("Creating a scratch FCN-8 Model with vgg weights")
-    vgg16 = models.vgg16(pretrained=True)
-    model.init_vgg16_params(vgg16)
+    start_epoch = dd['best_epoch'] + 1
+elif conf['pretrained_model']:
+    print("Loading Pretrained Model from: ", conf['load_model_path'])
+    model.load_state_dict(torch.load(conf['load_model_path']))
     conf['best_mean_iou'] = -10 
+    start_epoch = 1
+else:
+    print("Creating a scratch {} Model with vgg weights".format(conf['model']))
+    # vgg16 = models.vgg16(pretrained=True)
+    # model.init_vgg16_params(vgg16)
+    conf['best_mean_iou'] = -10 
+    start_epoch = 1
 
 if conf['num_gpus'] >1:
     model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
@@ -146,11 +171,17 @@ optimizer_ft = optim.SGD(model.parameters(), **conf['optimizer_config'])
 
 # loss_fn = dice_loss
 # loss_fn = nn.BCEWithLogitsLoss()
-loss_fn = nn.BCEWithLogitsLoss(pos_weight = conf['classWeights'].to(device))
+# loss_fn = nn.BCEWithLogitsLoss(pos_weight = conf['classWeights'].to(device))
+loss_fn = nn.CrossEntropyLoss(weight = conf['classWeights'].to(device))
+# loss_fn = nn.CrossEntropyLoss(weight = conf['classWeights'].to(device), ignore_index = 0)
 # loss_fn = functools.partial(cross_entropy2d, **conf['loss_params'])
 
-epochs = conf['max_epochs']
-print("Starting Training with {} epochs".format(epochs))
+if conf['train']:
+    epochs = conf['max_epochs']
+    print("Starting Training with {} epochs".format(epochs))
+else:
+    epochs = 1
+    print("Starting Evaluation with {} epochs".format(epochs))
 
 num_classes = 21
 
@@ -158,8 +189,9 @@ print("Saving Conf Parameters: {}".format(conf['save_path']))
 conf_path = "{}/conf.pickle".format(conf['save_path'])
 
 since = time.time()
-for epoch in range(1, epochs + 1):
-    train(model, device, train_loader, optimizer_ft, epoch, conf, loss_fn, num_classes)
+for epoch in range(start_epoch, epochs + 1):
+    if conf['train']:
+        train(model, device, train_loader, optimizer_ft, epoch, conf, loss_fn, num_classes)
     val(model, device, validation_loader, epoch, dataset_sizes['val'], conf, loss_fn, num_classes, dst)
     print("Time Taken for epoch%d: %d sec"%(epoch, time.time()-since))
     since = time.time()

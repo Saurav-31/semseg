@@ -5,6 +5,7 @@ import eval_metrics as ev
 def calc_metrics(label, out_pred):
     n = label.size(0)
     # print("Batch Size: ", n)
+
     pix_acc = 0
     mean_acc = 0
     mean_iou = 0
@@ -14,10 +15,10 @@ def calc_metrics(label, out_pred):
         gt = label[i].cpu().data.numpy()
         pred = out_pred[i].cpu().data.numpy()
         
-        pix_acc += ev.pixel_accuracy(gt, pred)
-        mean_acc += ev.mean_accuracy(gt, pred)
-        mean_iou += ev.mean_IU(gt, pred)
-        freq_w_iou += ev.frequency_weighted_IU(gt, pred)
+        pix_acc += ev.pixel_accuracy(pred.copy(), gt.copy())
+        mean_acc += ev.mean_accuracy(pred.copy(), gt.copy())
+        mean_iou += ev.mean_IU(pred.copy(), gt.copy())
+        freq_w_iou += ev.frequency_weighted_IU(pred.copy(), gt.copy())
 
     # print("Pixel Accuracy: ", pix_acc/n)
     # print("Mean Accuracy: ", mean_acc/n)

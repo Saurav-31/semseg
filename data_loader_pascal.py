@@ -9,6 +9,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from torch.utils import data
 import torch
+import pdb 
 
 class PascalVOCLoader(Dataset):
 	def __init__(self, root, transform,  split="trainval", is_transform=False, img_size=256, augmentations=None, img_norm=True):
@@ -19,15 +20,17 @@ class PascalVOCLoader(Dataset):
 		self.img_norm = img_norm
 		self.n_classes = 21
 		self.classes = self.pascal_classes()
-		self.mean = np.array([104.00699, 116.66877, 122.67892])
+		# self.mean = np.array([104.00699, 116.66877, 122.67892])
+		self.mean = np.array([123.68, 116.779, 103.939])[None, None, :]
+		# self.mean = np.array([103.939, 123.68, 116.779])[None, None, :] ##PSPnet
 		self.files = collections.defaultdict(list)
 		self.img_size = ( img_size if isinstance(img_size, tuple) else (img_size, img_size))		
-		for split in ["train", "val", "trainval"]:
-		    path = os.path.join(self.root, "ImageSets/Segmentation/", split + ".txt")
-		    file_list = tuple(open(path, "r"))
-		    file_list = [id_.rstrip() for id_ in file_list]
-		    self.files[split] = file_list
+		# for split in ["train", "val", "trainval"]:
 
+		path = os.path.join(self.root, "ImageSets/Segmentation/", split + ".txt")
+		file_list = tuple(open(path, "r"))
+		file_list = [id_.rstrip() for id_ in file_list]
+		self.files[split] = file_list
 		self.tf = transform #, transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
 
 	def __len__(self):
@@ -36,22 +39,53 @@ class PascalVOCLoader(Dataset):
 	def __getitem__(self, index):
 		im_name = self.files[self.split][index]
 		im_path = os.path.join(self.root, "JPEGImages", im_name + ".jpg")
-		lbl_path = os.path.join(self.root, "SegmentationClass/", im_name + ".png")
 		im = Image.open(im_path)
+		
+		if self.split == 'test':
+			if self.img_norm:
+				im = np.array(im)
+				im = im.transpose(2, 0, 1)
+				im = im.astype(np.float64)
+				im -= np.array([123.68, 116.779, 103.939])[:, None, None]
+				im = np.copy(im[::-1, :, :])
+				im = torch.from_numpy(im).float()
+			else:
+				im = transforms.ToTensor()(im) 
+			return im 
+
+		lbl_path = os.path.join(self.root, "SegmentationClass/", im_name + ".png")
 		lbl = Image.open(lbl_path)
+
 		if self.aug is not None:
 		    im, lbl = self.augmentations(im, lbl)
+
+	    # if self.img_norm:
+	    	# im = (np.array(im) - self.mean).copy()
+			# im = Image.fromarray(np.uint8(im))
+			
 		if self.is_transform:
 		    im, lbl = self.transform(im, lbl)
+
+		# if self.img_norm:
+		# 	im = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(im)
+			
 		return im, lbl
 
 	def transform(self, img, lbl):
 		if self.img_size == ('same', 'same'):
 		    pass
 		else:
-		    img = img.resize((self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
-		    lbl = lbl.resize((self.img_size[0], self.img_size[1]))
-		img = self.tf(img)
+			img = img.resize((self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+			lbl = lbl.resize((self.img_size[0], self.img_size[1]))
+
+		# img = self.tf(img)
+		img = np.array(img)
+		img = img.transpose(2, 0, 1)
+		img = img.astype(np.float64)
+		img -= np.array([123.68, 116.779, 103.939])[:, None, None]
+		img = np.copy(img[::-1, :, :])
+		img = torch.from_numpy(img).float()  # convert to torch tensor
+		
 		lbl = torch.from_numpy(np.array(lbl)).long()
 		lbl[lbl == 255] = 0
 		return img, lbl

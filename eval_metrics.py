@@ -67,6 +67,12 @@ def mean_IU(eval_segm, gt_segm):
     '''
     (1/n_cl) * sum_i(n_ii / (t_i + sum_j(n_ji) - n_ii))
     '''
+    # print("GT:", gt_segm.shape, np.unique(gt_segm))
+    # print("EVAL:", eval_segm.shape, np.unique(eval_segm))
+
+    # print(set(list(gt_segm.flatten())))
+    
+    # print(gt_segm)
 
     check_size(eval_segm, gt_segm)
 
@@ -74,9 +80,18 @@ def mean_IU(eval_segm, gt_segm):
     _, n_cl_gt = extract_classes(gt_segm)
     eval_mask, gt_mask = extract_both_masks(eval_segm, gt_segm, cl, n_cl)
 
-    IU = list([0]) * n_cl
+    IU = [0 for ix in range(n_cl)]
+
+    # print("Unioun Classes: ", n_cl)
+    # print("All Classes: ", cl)
+
+    decrease_flag = False
 
     for i, c in enumerate(cl):
+        if c==0:
+            decrease_flag = True
+            IU[i] = 0 
+            continue
         curr_eval_mask = eval_mask[i, :, :]
         curr_gt_mask = gt_mask[i, :, :]
  
@@ -88,8 +103,14 @@ def mean_IU(eval_segm, gt_segm):
         n_ij = np.sum(curr_eval_mask)
 
         IU[i] = n_ii / (t_i + n_ij - n_ii)
- 
-    mean_IU_ = np.sum(IU) / n_cl_gt
+    
+    if decrease_flag:
+        n_cl_gt -= 1
+
+    if n_cl_gt == 0:
+        print(IU, n_cl_gt, cl)
+    
+    mean_IU_ = np.sum(IU) / (n_cl_gt)
     return mean_IU_
 
 def frequency_weighted_IU(eval_segm, gt_segm):

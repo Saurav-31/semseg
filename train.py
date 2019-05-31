@@ -39,6 +39,10 @@ def train(model, device, train_loader, optimizer, epoch, conf, loss_fn, num_clas
         data, target = sample[0].float().to(device), sample[1].float().to(device)
         optimizer.zero_grad()
         output = model(data)
+
+        if isinstance(output, tuple): 
+            output = output[1] 
+        
         out_masks = nn.Sigmoid()(output)
         out_pred = output.data.max(1)[1].to(device)
         label = target
@@ -50,7 +54,11 @@ def train(model, device, train_loader, optimizer, epoch, conf, loss_fn, num_clas
 
         # print(data.shape, target.shape, output.shape, out_masks.shape, target.shape)
         # acc += iou(out_masks, target)/conf['batch_size']
-        loss = loss_fn(input = output.transpose(2, 0).transpose(3, 1), target = target.transpose(2, 0).transpose(3, 1))
+        if isinstance(loss_fn, torch.nn.modules.loss.CrossEntropyLoss):
+            loss = loss_fn(input = output, target = label.long())
+        else:     
+            loss = loss_fn(input = output.transpose(2, 0).transpose(3, 1), target = target.transpose(2, 0).transpose(3, 1))
+
         loss.backward()
         avg_loss += loss.item()
         optimizer.step()
@@ -116,8 +124,10 @@ def val(model, device, test_loader, epoch, data_size, conf, loss_fn, num_classes
 
             # acc += iou(out_masks, target)/conf['batch_size']
             # global_iou += iou(out_masks, target)
-
-            loss = loss_fn(input = output.transpose(2, 0).transpose(3, 1), target = target.transpose(2, 0).transpose(3, 1))
+            if isinstance(loss_fn, torch.nn.modules.loss.CrossEntropyLoss):
+                loss = loss_fn(input = output, target = label.long())
+            else:     
+                loss = loss_fn(input = output.transpose(2, 0).transpose(3, 1), target = target.transpose(2, 0).transpose(3, 1))
 
             test_loss += loss.item()
             batch_loss += loss.item()

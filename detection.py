@@ -19,8 +19,8 @@ dataset_path = '/mnt/sqnap1/saugupt/public_datasets/PascalVoc2012/'
 # data_transform1 = transforms.Compose([transforms.Resize(256), transforms.ToTensor()])
 data_transform1 = transforms.ToTensor()
 
-aug = Sequence([RandomHSV(40, 40, 30),RandomHorizontalFlip(), RandomScale(0.5), RandomTranslate(), RandomRotate(20), RandomShear(), Resize(256)])
-# aug = None
+# aug = Sequence([RandomHSV(40, 40, 30),RandomHorizontalFlip(), RandomScale(0.5), RandomTranslate(), RandomRotate(20), RandomShear(), Resize(256)])
+aug = None
 
 dst = PascalDetection(root=dataset_path, is_transform=True, transform = data_transform1, augmentations=aug, img_norm=False, split = 'trainval')
 print(len(dst))
